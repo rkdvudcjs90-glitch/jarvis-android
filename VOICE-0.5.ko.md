@@ -11,4 +11,13 @@
 
 ## 검증
 
-빌드 및 Android 16 에뮬레이터 결과와 설치 링크는 검사 완료 후 기록합니다. 에뮬레이터의 서비스 자동 시작은 실제 호출어 정확도나 장시간 화면 꺼짐 동작 검증을 대체하지 않습니다.
+[설치 APK](https://github.com/rkdvudcjs90-glitch/jarvis-android/releases/download/preview-10/JARVIS-0.5.0.apk) · [실행 화면](https://github.com/rkdvudcjs90-glitch/jarvis-android/releases/download/preview-10/hologram.png) · [움직임 미리보기](https://github.com/rkdvudcjs90-glitch/jarvis-android/releases/download/preview-10/design-preview.mp4)
+
+- Actions 38820088228: 컴파일·단위 검사·lint·서명 검증 및 Android 16 에뮬레이터 검사 통과.
+- 권한 부여 후 Activity 실행만으로 microphone foreground service가 시작됨, 기본 화면 버튼 없음, 제목 길게 누르기 설정, 자동 대기를 끈 설정의 재실행 유지, 실제 구체 표시와 시간에 따른 화면 변화, GL 오류 없음, Keystore 암호화 왕복, 한국어 네이티브 모델 로드와 무음 디코딩을 검증했습니다.
+- 자동 대기와 서비스 종료를 구분하는 한국어 정책 검사 통과. 무음 12초 복귀 타이머는 코드에 적용했으나 실제 발화·TTS와 결합한 실기기 종단 검사는 미실시입니다.
+- 처음 검사는 준비 중 주황색을 청백색 전용 조건으로 판별하여 실패했습니다. 실패 캡처에서 실제 구체를 확인한 후 최대 RGB 채널 기준으로 바꿔 상태별 색상을 검증합니다. 표시·움직임 표본 수 기준은 유지했습니다.
+- 미리보기는 실제 에뮬레이터 화면 8장을 5fps로 인코딩했으며 실시간 프레임 속도 측정 자료가 아닙니다. 준비 중 상태는 주황색입니다.
+- APK SHA-256: `029116e1182863d5b4ec9993a87f0d0775429515aac7453e235b36fe39f7e671`.
+
+에뮬레이터의 서비스 자동 시작은 실제 호출어 정확도나 장시간 화면 꺼짐 동작 검증을 대체하지 않습니다. 0.2 preview-4 이후와 같은 서명 키를 복원해 빌드했으며 기존 앱을 삭제하지 않고 업데이트하세요.

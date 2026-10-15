@@ -1,11 +1,11 @@
 # J.A.R.V.I.S. Android
 
-상시 음성 비서 · 청백색 입체 입자 네트워크 구체 UI 0.4 설치 테스트 버전.
+버튼 없는 호출 대기 · 청백색 입체 입자 구체 UI 0.5 설치 테스트 버전.
 
-[APK 다운로드](https://github.com/rkdvudcjs90-glitch/jarvis-android/releases/download/preview-8/JARVIS-0.4.0.apk) · [실제 실행 화면](https://github.com/rkdvudcjs90-glitch/jarvis-android/releases/download/preview-8/hologram.png) · [UI 변경·검증](DESIGN-0.4.ko.md) · [상시 음성 사용 범위](VOICE-0.2.ko.md)
+[APK 다운로드](https://github.com/rkdvudcjs90-glitch/jarvis-android/releases/download/preview-10/JARVIS-0.5.0.apk) · [실제 실행 화면](https://github.com/rkdvudcjs90-glitch/jarvis-android/releases/download/preview-10/hologram.png) · [자동 대기 사용·검증](VOICE-0.5.ko.md) · [구체 디자인](DESIGN-0.4.ko.md)
 
-처음 ‘상시 대기 시작’을 누른 뒤 ‘자비스’ 호출 → 사장님 인사 → 음성 대화·허용된 제어 명령 실행 구조입니다.
+처음 권한과 API 설정을 마치면 앱을 열 때 자동으로 호출을 기다립니다. ‘자비스’ → 사장님 인사 → 음성 대화·허용된 제어 명령 → 12초 무음 또는 ‘대기해’ → 호출 대기 구조입니다. 메인 화면에 시작 버튼은 없으며 제목을 길게 누르면 설정·조작 패널이 열립니다.
 
-컴파일·자동 테스트·서명·Android 16 모델 로드 및 입자 구체 표시·움직임 검사를 통과했습니다. 실제 호출어 인식률·화면 꺼짐 장시간 대기·AI 도구 선택·음성 명령 실행은 실기기 검증이 필요합니다.
+‘상시 대기 종료’ 음성 명령 또는 알림의 종료는 마이크를 끄며 다음 실행에서도 종료 선택을 유지합니다. 다시 켜려면 제목을 길게 눌러 패널에서 시작하세요.
 
-모든 앱의 완전 자동화는 구현하지 않았습니다. 최초 권한·서비스 시작·재부팅 후 재시작 및 보안 잠금 해제에는 직접 조작이 필요합니다.
+재부팅·강제 종료 후에는 앱을 다시 열어야 합니다. 실제 호출 정확도, 장시간 화면 꺼짐 대기와 배터리 사용은 실기기 검증이 필요합니다. 모든 앱의 완전 자동화는 구현하지 않았습니다.
