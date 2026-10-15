@@ -52,6 +52,7 @@ class SmokeInstrumentation : Instrumentation() {
             runOnMainSync {
                 check(descendants(activity!!.window.decorView).filterIsInstance<Button>().none { it.isShown }) { "Control buttons visible on voice-first screen" }
             }
+            check(uiAutomation.rootInActiveWindow?.findAccessibilityNodeInfosByText("Viewing full screen")?.isEmpty()!=false) { "Android fullscreen tutorial obscures the preview" }
             var core: Hologram?=null
             runOnMainSync { core=descendants(activity!!.window.decorView).filterIsInstance<Hologram>().single() }
             val folder=File(targetContext.getExternalFilesDir(null),"smoke").apply { mkdirs() }
