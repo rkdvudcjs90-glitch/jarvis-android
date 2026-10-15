@@ -50,7 +50,7 @@ class SmokeInstrumentation : Instrumentation() {
                         if(android.graphics.Color.green(color)>110 && android.graphics.Color.blue(color)>120) luminous++
                     }
                 }
-                check(luminous>100) { "Neon core did not render visibly: $luminous samples" }
+                check(luminous>100) { "Particle mesh did not render visibly: $luminous samples" }
                 val folder=File(targetContext.getExternalFilesDir(null),"smoke").apply { mkdirs() }
                 File(folder,"hologram.png").outputStream().use { preview.compress(Bitmap.CompressFormat.PNG,100,it) }
             } finally { preview.recycle() }
@@ -67,7 +67,7 @@ class SmokeInstrumentation : Instrumentation() {
             uiAutomation.takeScreenshot()?.let { bitmap ->
                 File(directory,"settings.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG,100,it) }; bitmap.recycle()
             }
-            result.putString("stream","PASS: Android launch, visible neon core rendering, hologram layout, expandable settings entry, Keystore AES-GCM encrypted round-trip. Korean native offline model load and silence decoding passed. Wake vocabulary: $words. Wake accuracy, screen-off standby, real voice/API/ROOT/device remain unverified.\n")
+            result.putString("stream","PASS: Android launch, visible animated particle mesh rendering, hologram layout, expandable settings entry, Keystore AES-GCM encrypted round-trip. Korean native offline model load and silence decoding passed. Wake vocabulary: $words. Wake accuracy, screen-off standby, real voice/API/ROOT/device remain unverified.\n")
             finish(Activity.RESULT_OK,result)
         } catch(t: Throwable) {
             result.putString("stream","FAIL: ${t.javaClass.simpleName}: ${t.message}\n")
