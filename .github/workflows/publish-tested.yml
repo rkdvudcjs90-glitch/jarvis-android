@@ -16,12 +16,12 @@ jobs:
           run-id: '38822439544'
           github-token: ${{ github.token }}
           path: apk
-      - uses: actions/download-artifact@v4
-        with:
-          artifact-ids: '12013099203'
-          run-id: '38822439544'
-          github-token: ${{ github.token }}
-          path: smoke
+      - name: Download exact passed retry archive
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api repos/rkdvudcjs90-glitch/jarvis-android/actions/artifacts/12013099203/zip > passed.zip
+          unzip -q passed.zip -d smoke
       - name: Verify passed evidence and publish
         env:
           GH_TOKEN: ${{ github.token }}
