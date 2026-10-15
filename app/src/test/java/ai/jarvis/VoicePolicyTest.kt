@@ -3,6 +3,14 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class VoicePolicyTest {
+    @Test fun ordinaryStandbyKeepsWakeListenerSeparateFromShutdown() {
+        listOf("고마워", "자비스 대기해", "대기 모드로", "수고했어").forEach {
+            assertTrue(it,VoicePolicy.returnToWake(it)); assertNull(it,VoicePolicy.action(it))
+        }
+        assertFalse(VoicePolicy.returnToWake("상시 대기 종료"))
+        assertEquals(VoicePolicy.Action.STOP,VoicePolicy.action("상시 대기 종료"))
+        assertFalse(VoicePolicy.returnToWake("대기하지 마"))
+    }
     @Test fun wakeRequiresRecognizedName() {
         assertTrue(VoicePolicy.wake("자 비 스"))
         assertTrue(VoicePolicy.wake("자비스"))

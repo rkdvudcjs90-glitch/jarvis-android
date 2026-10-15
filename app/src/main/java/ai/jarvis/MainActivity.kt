@@ -41,6 +41,7 @@ class MainActivity : Activity(), RecognitionListener {
     private val api = OpenAi()
     private val main = Handler(Looper.getMainLooper())
     private var voiceRevision = 0L
+    private var autoStartAttempted = false
     private val voicePoll = object : Runnable {
         override fun run() {
             if (!visible || isDestroyed) return
@@ -53,6 +54,8 @@ class MainActivity : Activity(), RecognitionListener {
                     voiceRevision=revision
                     guarded { val saved=vault.get("history"); if(saved.isNotBlank()) { history=JSONArray(saved); renderHistory() } }
                 }
+            } else if(autoStartAttempted && !busy && !listening && prefs.getInt("voice-mode",0)==4) {
+                problem(prefs.getString("voice-status","음성 대기 오류 · 제목을 길게 눌러 설정") ?: "음성 대기 오류")
             }
             main.postDelayed(this, 700)
         }
@@ -89,7 +92,7 @@ class MainActivity : Activity(), RecognitionListener {
             setShadowLayer(16f,0f,0f,Color.rgb(0,180,210)); setPadding(12,28,12,4)
         }
         layout.addView(title)
-        status=text("상시 대기를 시작하면 ‘자비스’라고 부르세요",13f).apply {
+        status=text("음성 대기 준비 중",13f).apply {
             gravity=Gravity.CENTER; maxLines=3; ellipsize=android.text.TextUtils.TruncateAt.END
         }
         layout.addView(status)
@@ -103,17 +106,18 @@ class MainActivity : Activity(), RecognitionListener {
         val panel=LinearLayout(this).apply { orientation=LinearLayout.VERTICAL; visibility=View.GONE }
         val toolbar=LinearLayout(this)
         quickStandby=button("상시 대기 시작") {
-            if(VoiceService.running) { stopService(Intent(this,VoiceService::class.java)); state("상시 대기 종료") }
-            else startStandby()
+            if(VoiceService.running) { prefs.edit().putBoolean("voice-auto-enabled",false).apply(); stopService(Intent(this,VoiceService::class.java)); state("음성 대기 꺼짐 · 제목을 길게 눌러 설정") }
+            else { prefs.edit().putBoolean("voice-auto-enabled",true).apply(); startStandby() }
         }
-        toolbar.addView(quickStandby,LinearLayout.LayoutParams(0,-2,1f).apply { setMargins(4,4,4,4) })
-        val expand=button("설정·조작") {}
-        expand.setOnClickListener {
+        // The normal screen has no control buttons. Keep recovery controls discoverable
+        // through the title's standard Android long-click accessibility action.
+        title.contentDescription="자비스. 길게 누르면 설정과 조작 패널을 엽니다."
+        title.setOnLongClickListener {
             panel.visibility=if(panel.visibility==View.VISIBLE) View.GONE else View.VISIBLE
-            expand.text=if(panel.visibility==View.VISIBLE) "조작 패널 닫기" else "설정·조작"
+            true
         }
-        toolbar.addView(expand,LinearLayout.LayoutParams(0,-2,1f).apply { setMargins(4,4,4,4) })
-        layout.addView(toolbar)
+        toolbar.addView(quickStandby,LinearLayout.LayoutParams(-1,-2))
+        panel.addView(toolbar)
         val scroll=ScrollView(this)
         transcript=text("")
         scroll.addView(transcript)
@@ -141,16 +145,16 @@ class MainActivity : Activity(), RecognitionListener {
         tts = TextToSpeech(this) { result -> main.post {
             val language = if(result == TextToSpeech.SUCCESS) tts?.setLanguage(Locale.KOREAN) else null
             ttsReady = language != null && language != TextToSpeech.LANG_MISSING_DATA && language != TextToSpeech.LANG_NOT_SUPPORTED
-            if(!ttsReady) state("한국어 TTS 미설치 · 설정에서 음성 엔진을 확인하세요")
+            if(!ttsReady && !VoiceService.running) state("한국어 TTS 미설치 · 설정에서 음성 엔진을 확인하세요")
         } }
         tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
-            override fun onStart(id: String?) { main.post { if(visible) state("응답 중",3) } }
-            override fun onDone(id: String?) { main.post { if(visible && !busy && !listening) state("대기 중") } }
+            override fun onStart(id: String?) { main.post { if(visible && !VoiceService.running) state("응답 중",3) } }
+            override fun onDone(id: String?) { main.post { if(visible && !VoiceService.running && !busy && !listening) state("대기 중") } }
             @Deprecated("Deprecated in Java") override fun onError(id: String?) { main.post { if(visible) problem("음성 출력 실패 · 답변은 화면에서 확인하세요") } }
         })
         if(!prefs.getBoolean("onboarded",false)) {
             AlertDialog.Builder(this).setTitle("자비스 시작 안내")
-                .setMessage("설정에서 OpenAI API 키를 입력하세요. 메시지와 최근 대화가 OpenAI로 전송되며 API 요금이 발생합니다. 음성 인식은 설치된 Android 음성 서비스가 처리하며 네트워크로 전송될 수 있습니다.\n\n음성 버튼은 누를 때 녹음하며, 상시 대기를 시작하면 호출어 감지를 위해 마이크를 계속 사용합니다. 알림과 대기 종료로 중단할 수 있습니다. 접근성은 선택 사항이며 화면 내용을 수집하지 않습니다. 승인 후 지원되는 음성 지시 또는 제어 버튼으로 동작합니다. ROOT는 별도 선택 기능입니다.")
+                .setMessage("설정에서 OpenAI API 키를 입력하세요. 메시지와 최근 대화가 OpenAI로 전송되며 API 요금이 발생합니다. 음성 인식은 설치된 Android 음성 서비스가 처리하며 네트워크로 전송될 수 있습니다.\n\n권한 허용 후 앱을 열면 자동으로 마이크를 사용하여 기기 안에서 ‘자비스’를 감지합니다. 대화가 끝나고 12초 동안 말이 없으면 자동으로 호출 대기로 돌아갑니다. 상단 제목을 길게 누르면 설정이 열립니다. 알림이나 ‘상시 대기 종료’ 음성 명령으로 마이크 대기를 끌 수 있습니다. 재부팅·강제 종료 뒤에는 앱을 다시 열어 주세요. 접근성은 선택 사항이며 화면 내용을 수집하지 않습니다. 승인 후 지원되는 음성 지시 또는 제어 버튼으로 동작합니다. ROOT는 별도 선택 기능입니다.")
                 .setPositiveButton("설정 열기") { _,_ -> prefs.edit().putBoolean("onboarded",true).apply(); settings() }.show()
         }
     }
@@ -162,14 +166,19 @@ class MainActivity : Activity(), RecognitionListener {
         if(busy) { problem("현재 대화가 끝난 후 시작하세요."); return }
         if(VoiceService.running) { state("이미 상시 대기가 켜져 있습니다."); return }
         if(checkSelfPermission(Manifest.permission.RECORD_AUDIO)!=PackageManager.PERMISSION_GRANTED) { requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO),12); return }
-        if(Build.VERSION.SDK_INT>=33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED) { requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS),13); return }
-        AlertDialog.Builder(this).setTitle("상시 음성 대기 시작")
-            .setMessage("기기 안의 한국어 모델이 마이크를 계속 사용해 ‘자비스’를 감지합니다. 배터리 소모와 발열이 늘 수 있습니다. 호출 뒤의 일반 AI 질문은 OpenAI로 전송됩니다.\n\n시작 후 화면을 꺼도 계속 대기하도록 구성되어 있지만 삼성 배터리 제한에 따라 중단될 수 있습니다. 재부팅·강제 종료 후에는 앱을 열어 다시 시작해야 합니다. 알림이나 ‘대기 종료’ 음성 명령으로 중단할 수 있습니다.")
-            .setNegativeButton("취소",null).setPositiveButton("시작") { _,_ -> guarded {
-                recognizer?.cancel(); tts?.stop()
-                startForegroundService(Intent(this,VoiceService::class.java))
-            } }.show()
+        if(Build.VERSION.SDK_INT>=33 && !prefs.getBoolean("voice-notification-asked",false) && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED) { prefs.edit().putBoolean("voice-notification-asked",true).apply(); requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS),13); return }
+        recognizer?.cancel(); tts?.stop()
+        guarded { startForegroundService(Intent(this,VoiceService::class.java)) }
     }
+    private fun autoStandby() {
+        if(!autoStartAttempted && prefs.getBoolean("onboarded",false) && prefs.getBoolean("voice-auto-enabled",true)) {
+            autoStartAttempted=true
+            startStandby()
+        } else if(!VoiceService.running && !prefs.getBoolean("voice-auto-enabled",true)) {
+            state("음성 대기 꺼짐 · 제목을 길게 눌러 설정")
+        }
+    }
+
     private fun submit(raw: String) {
         val message = raw.trim()
         if(VoiceService.running) {
@@ -218,8 +227,9 @@ class MainActivity : Activity(), RecognitionListener {
     override fun onRequestPermissionsResult(code: Int, permissions: Array<out String>, results: IntArray) {
         super.onRequestPermissionsResult(code,permissions,results)
         if(code==12 || code==13) {
-            if(results.firstOrNull()==PackageManager.PERMISSION_GRANTED) startStandby()
-            else problem("상시 대기는 마이크와 상태 알림 권한을 허용한 뒤 시작하세요.")
+            // Notification denial does not prohibit a microphone foreground service.
+            if(code==13 || results.firstOrNull()==PackageManager.PERMISSION_GRANTED) startStandby()
+            else problem("마이크 권한 필요 · 제목을 길게 눌러 설정하세요.")
         }
         if(code==10) { if(results.firstOrNull()==PackageManager.PERMISSION_GRANTED) startListening() else problem("마이크 권한이 거부되었습니다. 설정·권한에서 변경할 수 있습니다.") }
     }
@@ -253,7 +263,7 @@ class MainActivity : Activity(), RecognitionListener {
         AlertDialog.Builder(this).setTitle("설정·권한").setView(ScrollView(this).apply { addView(box) }).setNegativeButton("닫기",null).setPositiveButton("저장") { _,_ -> guarded {
             val value=key.text.toString().trim(); if(value.isNotEmpty()) vault.put("api-key",value)
             val modelId=model.text.toString().trim(); require(modelId.matches(Regex("[A-Za-z0-9._:-]{1,100}"))) { "올바른 모델 ID를 입력하세요." }
-            prefs.edit().putString("model",modelId).apply(); key.text.clear(); state("설정 저장 완료")
+            prefs.edit().putString("model",modelId).apply(); key.text.clear(); state("설정 저장 완료"); autoStandby()
         } }.show()
     }
     private fun global(action: Int) {
@@ -288,7 +298,7 @@ class MainActivity : Activity(), RecognitionListener {
         box.addView(rootButtons)
         AlertDialog.Builder(this).setTitle("휴대폰 제어").setView(ScrollView(this).apply { addView(box) }).setPositiveButton("닫기",null).show()
     }
-    override fun onResume() { super.onResume(); visible=true; orb.onResume(); main.removeCallbacks(voicePoll); main.post(voicePoll) }
+    override fun onResume() { super.onResume(); visible=true; orb.onResume(); main.removeCallbacks(voicePoll); main.post(voicePoll); autoStandby() }
     override fun onPause() { visible=false; main.removeCallbacks(voicePoll); recognizer?.cancel(); listening=false; tts?.stop(); if(!busy) state("대기 중"); orb.onPause(); super.onPause() }
     override fun onDestroy() { recognizer?.destroy(); tts?.shutdown(); api.cancel(); worker.shutdownNow(); main.removeCallbacksAndMessages(null); super.onDestroy() }
     override fun onReadyForSpeech(params: Bundle?) {}

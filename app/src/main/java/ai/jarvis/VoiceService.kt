@@ -23,6 +23,7 @@ import java.util.concurrent.Executors
 class VoiceService : Service(), RecognitionListener {
     companion object {
         @Volatile var running=false; private set
+        @Volatile var foregroundStarts=0; private set
         const val STOP="ai.jarvis.STOP"
         const val TEXT="ai.jarvis.TEXT"
         const val PING="ai.jarvis.PING"
@@ -42,6 +43,7 @@ class VoiceService : Service(), RecognitionListener {
     private var dead=false
     private var speakNext: (() -> Unit)?=null
     private var pending: VoicePolicy.Action?=null
+    private var lastPartial=""
     private var speakingId=0
     private var lock: PowerManager.WakeLock?=null
     private var history=JSONArray()
@@ -54,7 +56,7 @@ class VoiceService : Service(), RecognitionListener {
             }
         }
     }
-    private val timeout=Runnable { if(phase==Phase.COMMAND || phase==Phase.CONFIRM) { pending=null; say("호출 대기로 돌아갑니다.") { waitWake() } } }
+    private val timeout=Runnable { if(phase==Phase.COMMAND || phase==Phase.CONFIRM) { pending=null; waitWake() } }
     private val speechTimeout=Runnable { if(phase==Phase.SPEAKING) { tts?.stop(); afterSpeech() } }
     override fun onBind(intent: Intent?) = null
     override fun onCreate() {
@@ -66,7 +68,7 @@ class VoiceService : Service(), RecognitionListener {
             val note=notification("음성 대기 준비 중")
             if(Build.VERSION.SDK_INT>=30) startForeground(7,note,ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE) else startForeground(7,note)
             lock=getSystemService(PowerManager::class.java).newWakeLock(PowerManager.PARTIAL_WAKE_LOCK,"jarvis:voice").apply { setReferenceCounted(false); acquire(60*60*1000L) }
-            running=true; main.postDelayed(renewLock,30*60*1000L); update("한국어 오프라인 모델 준비 중 · 처음에는 시간이 걸립니다.",2)
+            running=true; foregroundStarts++; main.postDelayed(renewLock,30*60*1000L); update("한국어 오프라인 모델 준비 중 · 처음에는 시간이 걸립니다.",2)
             tts=TextToSpeech(this) { result -> main.post {
                 if(dead) return@post
                 val language=if(result==TextToSpeech.SUCCESS) tts?.setLanguage(Locale.KOREAN) else null
@@ -110,7 +112,7 @@ class VoiceService : Service(), RecognitionListener {
             recognizer=Recognizer(model,16000f)
             speech=SpeechService(recognizer,16000f)
             speech?.startListening(this)
-            say("자비스 상시 대기를 시작합니다. 자비스라고 불러 주십시오.") { waitWake() }
+            say("자비스 대기 중입니다.") { waitWake() }
         } catch(e: Exception) { fail("마이크 시작 실패 · 통화나 다른 녹음을 종료한 뒤 다시 시작하세요.") }
     }
     private fun fail(message: String) { update(message,4); stopSelf() }
@@ -122,8 +124,8 @@ class VoiceService : Service(), RecognitionListener {
     private fun listen(confirm: Boolean=false) {
         if(dead) return
         phase=if(confirm) Phase.CONFIRM else Phase.COMMAND
-        resetListening(); update(if(confirm) "‘실행’ 또는 ‘취소’라고 말씀하세요" else "지시를 말씀하세요",1)
-        main.removeCallbacks(timeout); main.postDelayed(timeout,20000)
+        lastPartial=""; resetListening(); update(if(confirm) "‘실행’ 또는 ‘취소’라고 말씀하세요" else "지시를 말씀하세요",1)
+        main.removeCallbacks(timeout); main.postDelayed(timeout,VoicePolicy.IDLE_MILLIS)
     }
     private fun afterSpeech() {
         main.removeCallbacks(speechTimeout)
@@ -146,7 +148,9 @@ class VoiceService : Service(), RecognitionListener {
             Phase.WAKE -> if(VoicePolicy.wake(text)) {
                 say("돌아오셨습니까, 사장님. 지시 기다리겠습니다.") { listen() }
             }
-            Phase.COMMAND -> if(!partial) command(text)
+            Phase.COMMAND -> if(!partial) command(text) else if(text!=lastPartial) {
+                lastPartial=text; main.removeCallbacks(timeout); main.postDelayed(timeout,VoicePolicy.IDLE_MILLIS)
+            }
             Phase.CONFIRM -> if(!partial) {
                 val action=pending
                 when {
@@ -162,7 +166,7 @@ class VoiceService : Service(), RecognitionListener {
         main.removeCallbacks(timeout); speech?.setPause(true)
         val action=VoicePolicy.action(text)
         if(action!=null) { handleAction(action); return }
-        if(VoicePolicy.cancelled(text) || VoicePolicy.normalize(text) in setOf("고마워", "대기해", "대기해줘")) { say("호출 대기하겠습니다.") { waitWake() }; return }
+        if(VoicePolicy.cancelled(text) || VoicePolicy.returnToWake(text)) { say("호출 대기하겠습니다.") { waitWake() }; return }
         phase=Phase.BUSY; update("생각 중",2)
         val request=JSONArray(history.toString()).put(JSONObject().put("role","user").put("content",text.take(6000)))
         val chosen=prefs.getString("model","gpt-4.1-mini") ?: "gpt-4.1-mini"
@@ -188,7 +192,7 @@ class VoiceService : Service(), RecognitionListener {
     }
     private fun perform(action: VoicePolicy.Action) {
         phase=Phase.BUSY; speech?.setPause(true)
-        if(action==VoicePolicy.Action.STOP) { say("상시 대기를 종료합니다.") { stopSelf() }; return }
+        if(action==VoicePolicy.Action.STOP) { prefs.edit().putBoolean("voice-auto-enabled",false).apply(); say("상시 대기를 종료합니다.") { stopSelf() }; return }
         try {
             val message=when(action) {
                 VoicePolicy.Action.HOME -> global(AccessibilityService.GLOBAL_ACTION_HOME,"홈 이동 요청이 처리됐습니다.")
@@ -220,7 +224,7 @@ class VoiceService : Service(), RecognitionListener {
         return "화면 열기를 요청했습니다."
     }
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if(intent?.action==STOP) stopSelf()
+        if(intent?.action==STOP) { prefs.edit().putBoolean("voice-auto-enabled",false).apply(); stopSelf() }
         else if(intent?.action==STOP_REPLY && phase==Phase.SPEAKING) { tts?.stop(); afterSpeech() }
         else if(intent?.action==PING && (phase==Phase.WAKE || phase==Phase.COMMAND)) say("상시 대기가 작동 중입니다.") { waitWake() }
         else if(intent?.action==TEXT && (phase==Phase.WAKE || phase==Phase.COMMAND)) intent.getStringExtra("text")?.let { command(it) }

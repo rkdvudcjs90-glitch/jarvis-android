@@ -7,6 +7,10 @@ object VoicePolicy {
     fun wake(text: String) = listOf("자비스", "자비쓰", "자비서", "jarvis").any { normalize(text).contains(it) }
     fun confirmed(text: String) = normalize(text) in setOf("네", "예", "응", "실행", "실행해", "실행해줘", "확인", "잠가", "잠가줘")
     fun cancelled(text: String) = normalize(text) in setOf("아니", "아니요", "취소", "취소해", "하지마", "그만", "됐어")
+    const val IDLE_MILLIS=12000L
+    fun returnToWake(text: String) = normalize(text).removePrefix("자비스") in setOf(
+        "고마워", "감사합니다", "수고했어", "대기해", "대기해줘", "대기모드", "대기모드로", "쉬어", "잘자", "그만", "됐어", "취소"
+    )
     fun action(text: String): Action? {
         val t=normalize(text).removePrefix("자비스")
         return when {
