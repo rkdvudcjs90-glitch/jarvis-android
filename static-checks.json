@@ -1,0 +1,9 @@
+{
+  "xml_parses": true,
+  "workflow_yaml_parses": true,
+  "backup_disabled_and_cleartext_disabled": true,
+  "accessibility_cannot_read_windows": true,
+  "ai_transport_has_no_shell_interface": true,
+  "shell_api_accepts_enum_only": true,
+  "note": "Static assertions only; not compilation or runtime validation."
+}
