@@ -40,20 +40,33 @@ class SmokeInstrumentation : Instrumentation() {
             } finally { localRecognizer.close(); localModel.close() }
             activity=startActivitySync(Intent(targetContext,MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
             waitForIdleSync()
-            Thread.sleep(2000) // Permit EGL surface creation; this is an emulator test, not a production delay.
-            val preview=uiAutomation.takeScreenshot() ?: error("Screenshot unavailable")
-            try {
-                var luminous=0
-                for(y in preview.height*3/10 until preview.height*7/10 step 4) {
-                    for(x in preview.width/5 until preview.width*4/5 step 4) {
-                        val color=preview.getPixel(x,y)
-                        if(android.graphics.Color.green(color)>110 && android.graphics.Color.blue(color)>120) luminous++
+            var core: Hologram?=null
+            runOnMainSync { core=descendants(activity!!.window.decorView).filterIsInstance<Hologram>().single() }
+            val folder=File(targetContext.getExternalFilesDir(null),"smoke").apply { mkdirs() }
+            val deadline=android.os.SystemClock.uptimeMillis()+15000
+            var preview: Bitmap?=null
+            var luminous=0
+            // Wait for real frame presentation rather than assuming a 2-second cold start.
+            while(android.os.SystemClock.uptimeMillis()<deadline) {
+                val next=uiAutomation.takeScreenshot()
+                if(next!=null) {
+                    preview?.recycle(); preview=next; luminous=0
+                    for(y in next.height*3/10 until next.height*7/10 step 4) {
+                        for(x in next.width/5 until next.width*4/5 step 4) {
+                            val color=next.getPixel(x,y)
+                            if(android.graphics.Color.green(color)>110 && android.graphics.Color.blue(color)>120) luminous++
+                        }
                     }
+                    if((core?.renderedFrames ?: 0)>0 && luminous>100) break
                 }
-                check(luminous>100) { "Particle mesh did not render visibly: $luminous samples" }
-                val folder=File(targetContext.getExternalFilesDir(null),"smoke").apply { mkdirs() }
-                File(folder,"hologram.png").outputStream().use { preview.compress(Bitmap.CompressFormat.PNG,100,it) }
-            } finally { preview.recycle() }
+                Thread.sleep(250)
+            }
+            val shot=preview ?: error("Screenshot unavailable")
+            try {
+                File(folder,"hologram.png").outputStream().use { shot.compress(Bitmap.CompressFormat.PNG,100,it) }
+                check(luminous>100) { "Particle mesh not visible: $luminous samples; frames=${core?.renderedFrames}; GL=${core?.drawError}" }
+                check(core?.drawError==android.opengl.GLES20.GL_NO_ERROR) { "OpenGL error: ${core?.drawError}" }
+            } finally { shot.recycle() }
             val animationFolder=File(targetContext.getExternalFilesDir(null),"smoke").apply { mkdirs() }
             var first: Bitmap?=null
             var changed=0

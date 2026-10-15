@@ -16,6 +16,8 @@ import kotlin.math.*
 class Hologram(context: Context) : GLSurfaceView(context), GLSurfaceView.Renderer {
     @Volatile var mode = 0
     @Volatile var level = 0f
+    @Volatile var renderedFrames = 0; private set
+    @Volatile var drawError = GL_NO_ERROR; private set
     private var program = 0
     private val transform = FloatArray(16)
     private val projection = FloatArray(16)
@@ -156,5 +158,9 @@ class Hologram(context: Context) : GLSurfaceView(context), GLSurfaceView.Rendere
         glDrawArrays(GL_POINTS,0,count)
         glUniform1f(gainLocation,1.7f); glUniform1f(sizeLocation,4.4f)
         glDrawArrays(GL_POINTS,0,count); glDisableVertexAttribArray(pointLocation)
+        if(renderedFrames<3 || renderedFrames%30==0) {
+            val observed=glGetError(); if(observed!=GL_NO_ERROR) drawError=observed
+        }
+        renderedFrames++
     }
 }
