@@ -41,6 +41,7 @@ class MainActivity : Activity(), RecognitionListener {
     private val main = Handler(Looper.getMainLooper())
     private var voiceRevision = 0L
     private var autoStartAttempted = false
+    private var controlsVisible = false
     private val voicePoll = object : Runnable {
         override fun run() {
             if (!visible || isDestroyed) return
@@ -94,9 +95,9 @@ class MainActivity : Activity(), RecognitionListener {
             gravity=Gravity.CENTER; maxLines=3; ellipsize=android.text.TextUtils.TruncateAt.END
             setTextColor(Color.rgb(155,205,218)); setPadding(16,4,16,18)
         }
-        layout.addView(lastMessage)
         val panel=LinearLayout(this).apply { orientation=LinearLayout.VERTICAL; visibility=View.GONE }
         panel.addView(status)
+        panel.addView(lastMessage)
         val toolbar=LinearLayout(this)
         quickStandby=button("상시 대기 시작") {
             if(VoiceService.running) { prefs.edit().putBoolean("voice-auto-enabled",false).apply(); stopService(Intent(this,VoiceService::class.java)); state("음성 대기 꺼짐 · 구체를 길게 눌러 설정") }
@@ -108,7 +109,9 @@ class MainActivity : Activity(), RecognitionListener {
         orb.importantForAccessibility=View.IMPORTANT_FOR_ACCESSIBILITY_YES
         orb.isFocusable=true
         orb.setOnLongClickListener {
-            panel.visibility=if(panel.visibility==View.VISIBLE) View.GONE else View.VISIBLE
+            controlsVisible=panel.visibility!=View.VISIBLE
+            panel.visibility=if(controlsVisible) View.VISIBLE else View.GONE
+            immersive(!controlsVisible)
             true
         }
         toolbar.addView(quickStandby,LinearLayout.LayoutParams(-1,-2))
@@ -293,7 +296,22 @@ class MainActivity : Activity(), RecognitionListener {
         box.addView(rootButtons)
         AlertDialog.Builder(this).setTitle("휴대폰 제어").setView(ScrollView(this).apply { addView(box) }).setPositiveButton("닫기",null).show()
     }
-    override fun onResume() { super.onResume(); visible=true; orb.onResume(); main.removeCallbacks(voicePoll); main.post(voicePoll); autoStandby() }
+    @Suppress("DEPRECATION")
+    private fun immersive(enabled: Boolean) {
+        if(Build.VERSION.SDK_INT>=30) {
+            window.insetsController?.apply {
+                systemBarsBehavior=WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+                if(enabled) hide(WindowInsets.Type.systemBars()) else show(WindowInsets.Type.systemBars())
+            }
+        } else {
+            window.decorView.systemUiVisibility=if(enabled) View.SYSTEM_UI_FLAG_FULLSCREEN or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION or View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY else View.SYSTEM_UI_FLAG_VISIBLE
+        }
+    }
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if(hasFocus) immersive(!controlsVisible)
+    }
+    override fun onResume() { super.onResume(); immersive(!controlsVisible); visible=true; orb.onResume(); main.removeCallbacks(voicePoll); main.post(voicePoll); autoStandby() }
     override fun onPause() { visible=false; main.removeCallbacks(voicePoll); recognizer?.cancel(); listening=false; tts?.stop(); if(!busy) state("대기 중"); orb.onPause(); super.onPause() }
     override fun onDestroy() { recognizer?.destroy(); tts?.shutdown(); api.cancel(); worker.shutdownNow(); main.removeCallbacksAndMessages(null); super.onDestroy() }
     override fun onReadyForSpeech(params: Bundle?) {}
