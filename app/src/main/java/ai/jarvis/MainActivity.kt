@@ -88,7 +88,6 @@ class MainActivity : Activity(), RecognitionListener {
         status=text("음성 대기 준비 중",13f).apply {
             gravity=Gravity.CENTER; maxLines=3; ellipsize=android.text.TextUtils.TruncateAt.END
         }
-        layout.addView(status)
         orb=Hologram(this)
         layout.addView(orb,LinearLayout.LayoutParams(-1,0,1f))
         lastMessage=text("말씀을 기다리고 있습니다",14f).apply {
@@ -97,6 +96,7 @@ class MainActivity : Activity(), RecognitionListener {
         }
         layout.addView(lastMessage)
         val panel=LinearLayout(this).apply { orientation=LinearLayout.VERTICAL; visibility=View.GONE }
+        panel.addView(status)
         val toolbar=LinearLayout(this)
         quickStandby=button("상시 대기 시작") {
             if(VoiceService.running) { prefs.edit().putBoolean("voice-auto-enabled",false).apply(); stopService(Intent(this,VoiceService::class.java)); state("음성 대기 꺼짐 · 구체를 길게 눌러 설정") }

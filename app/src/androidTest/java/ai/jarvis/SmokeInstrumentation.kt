@@ -106,7 +106,13 @@ class SmokeInstrumentation : Instrumentation() {
                 val views=descendants(activity!!.window.decorView)
                 check(views.filterIsInstance<Hologram>().any { it.width>0 && it.height>0 }) { "Hologram has no layout" }
                 check(views.filterIsInstance<TextView>().none { it.isShown && it.text.contains("J.A.R.V.I.S.") }) { "Name header is still visible" }
-                views.filterIsInstance<Hologram>().single().performLongClick()
+                val orb=views.filterIsInstance<Hologram>().single()
+                val orbPosition=IntArray(2); orb.getLocationOnScreen(orbPosition)
+                check(views.filterIsInstance<TextView>().none { view ->
+                    val position=IntArray(2); view.getLocationOnScreen(position)
+                    view.isShown && position[1]<orbPosition[1]
+                }) { "Status text remains above the orb" }
+                orb.performLongClick()
                 check(views.filterIsInstance<Button>().first { it.text=="설정·권한" }.isShown) { "Settings panel did not expand" }
                 views.filterIsInstance<Button>().first { it.text=="설정·권한" }.performClick()
             }
@@ -124,7 +130,7 @@ class SmokeInstrumentation : Instrumentation() {
             activity=startActivitySync(Intent(targetContext,MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
             waitForIdleSync(); Thread.sleep(700)
             check(VoiceService.foregroundStarts==startsAfter) { "Disabled voice service restarted on app launch" }
-            result.putString("stream","PASS: Android launch, visible animated particle mesh rendering, hologram layout, button-free main screen without name header, orb long-press settings, automatic foreground microphone service start after granted permissions, persistent shutdown on reopening, Keystore AES-GCM encrypted round-trip. Korean native offline model load and silence decoding passed. Wake vocabulary: $words. Wake accuracy, screen-off standby, real voice/API/ROOT/device remain unverified.\n")
+            result.putString("stream","PASS: Android launch, visible animated particle mesh rendering, hologram layout, button-free main screen without name header or top status text, orb long-press settings, automatic foreground microphone service start after granted permissions, persistent shutdown on reopening, Keystore AES-GCM encrypted round-trip. Korean native offline model load and silence decoding passed. Wake vocabulary: $words. Wake accuracy, screen-off standby, real voice/API/ROOT/device remain unverified.\n")
             finish(Activity.RESULT_OK,result)
         } catch(t: Throwable) {
             result.putString("stream","FAIL: ${t.javaClass.simpleName}: ${t.message}\n")
