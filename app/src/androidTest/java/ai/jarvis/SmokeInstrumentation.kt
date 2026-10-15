@@ -54,6 +54,29 @@ class SmokeInstrumentation : Instrumentation() {
                 val folder=File(targetContext.getExternalFilesDir(null),"smoke").apply { mkdirs() }
                 File(folder,"hologram.png").outputStream().use { preview.compress(Bitmap.CompressFormat.PNG,100,it) }
             } finally { preview.recycle() }
+            val animationFolder=File(targetContext.getExternalFilesDir(null),"smoke").apply { mkdirs() }
+            var first: Bitmap?=null
+            var changed=0
+            try {
+                for(i in 0 until 8) {
+                    Thread.sleep(180)
+                    val frame=uiAutomation.takeScreenshot() ?: error("Animation screenshot unavailable")
+                    try {
+                        File(animationFolder,"frame%02d.png".format(i)).outputStream().use { frame.compress(Bitmap.CompressFormat.PNG,100,it) }
+                        if(i==0) first=frame.copy(Bitmap.Config.ARGB_8888,false)
+                        if(i==7) {
+                            val initial=first ?: error("First frame missing")
+                            for(y in frame.height*3/10 until frame.height*7/10 step 4) {
+                                for(x in frame.width/5 until frame.width*4/5 step 4) {
+                                    val a=initial.getPixel(x,y); val b=frame.getPixel(x,y)
+                                    if(kotlin.math.abs(android.graphics.Color.blue(a)-android.graphics.Color.blue(b))>30) changed++
+                                }
+                            }
+                        }
+                    } finally { frame.recycle() }
+                }
+                check(changed>100) { "Particle geometry is static or not visible: $changed changed samples" }
+            } finally { first?.recycle() }
             runOnMainSync {
                 val views=descendants(activity!!.window.decorView)
                 check(views.filterIsInstance<Hologram>().any { it.width>0 && it.height>0 }) { "Hologram has no layout" }

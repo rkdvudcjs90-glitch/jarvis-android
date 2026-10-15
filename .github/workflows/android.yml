@@ -101,9 +101,8 @@ jobs:
             adb shell am instrument -w ai.jarvis.test/ai.jarvis.SmokeInstrumentation | tee instrumentation.txt
             grep -q 'PASS:' instrumentation.txt
             adb pull /sdcard/Android/data/ai.jarvis/files/smoke/ screenshots
-            adb shell am start -W -n ai.jarvis/.MainActivity
-            adb shell screenrecord --time-limit 4 /sdcard/jarvis-design-preview.mp4
-            adb pull /sdcard/jarvis-design-preview.mp4 design-preview.mp4
+            if ! command -v ffmpeg >/dev/null; then sudo apt-get update && sudo apt-get install -y ffmpeg; fi
+            ffmpeg -y -v error -framerate 5 -i screenshots/frame%02d.png -c:v libx264 -pix_fmt yuv420p -movflags +faststart design-preview.mp4
             adb logcat -d -b crash > crash-log.txt
       - uses: actions/upload-artifact@v4
         if: always()
