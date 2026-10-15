@@ -138,12 +138,12 @@ jobs:
           JARVIS_RUN: ${{ github.run_number }}
           JARVIS_SHA: ${{ github.sha }}
         run: |
-          cp apk/app-debug.apk JARVIS-0.5.0.apk
-          sha256sum JARVIS-0.5.0.apk > SHA256SUMS.txt
+          cp apk/app-debug.apk JARVIS-0.5.1.apk
+          sha256sum JARVIS-0.5.1.apk > SHA256SUMS.txt
           cat > release-notes.txt <<'NOTES'
-          시작 버튼 없는 자동 음성 대기 0.5 설치 테스트 APK. 최초 마이크 권한 허용 후 앱을 열면 자동으로 자비스 호출을 기다립니다. 메인 화면에는 구체와 상태만 표시하며 제목을 길게 눌러 설정을 엽니다. 대화 후 12초 무음 또는 대기해 명령으로 호출 대기에 복귀합니다.
+          시작 버튼 없는 자동 음성 대기 0.5.1 설치 테스트 APK. 최초 마이크 권한 허용 후 앱을 열면 자동으로 자비스 호출을 기다립니다. 메인 화면에서 상단 명칭을 제거했으며 구체를 길게 눌러 설정을 엽니다. 대화 후 12초 무음 또는 대기해 명령으로 호출 대기에 복귀합니다.
           CI: 컴파일, 단위 테스트, Android lint, APK 서명 및 Android 16 에뮬레이터 검증. 실제 호출 정확도, 화면 꺼짐 장시간 대기와 배터리는 Galaxy Z Flip5에서 추가 확인이 필요합니다.
-          재부팅·강제 종료 뒤에는 앱을 다시 열어 주세요. 대기 종료 음성 명령이나 알림으로 마이크를 끄면 다음 앱 실행에서도 그 선택을 유지합니다. 다시 켜려면 제목을 길게 누른 패널에서 시작하세요.
+          재부팅·강제 종료 뒤에는 앱을 다시 열어 주세요. 대기 종료 음성 명령이나 알림으로 마이크를 끄면 다음 앱 실행에서도 그 선택을 유지합니다. 다시 켜려면 구체를 길게 누른 패널에서 시작하세요.
           0.2 preview-4 이후와 같은 테스트 서명 키로 업데이트 설치하며 삭제는 필요하지 않습니다. 모든 앱의 완전 자동화는 구현하지 않았습니다. API 키는 앱 설정에서 직접 입력하세요.
           NOTES
-          gh release create "preview-$JARVIS_RUN" JARVIS-0.5.0.apk SHA256SUMS.txt smoke/screenshots/hologram.png smoke/design-preview.mp4 --target "$JARVIS_SHA" --prerelease --title 'JARVIS 0.5.0 · 자동 음성 대기' --notes-file release-notes.txt
+          gh release create "preview-$JARVIS_RUN" JARVIS-0.5.1.apk SHA256SUMS.txt smoke/screenshots/hologram.png smoke/design-preview.mp4 --target "$JARVIS_SHA" --prerelease --title 'JARVIS 0.5.1 · 명칭 없는 구체 화면' --notes-file release-notes.txt
