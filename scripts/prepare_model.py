@@ -10,7 +10,9 @@ archive = base / 'model-download.zip'
 url = 'https://alphacephei.com/vosk/models/vosk-model-small-ko-0.22.zip'
 with urlopen(url, timeout=90) as response, archive.open('wb') as output:
     shutil.copyfileobj(response, output)
-print('Korean model archive SHA256:', hashlib.sha256(archive.read_bytes()).hexdigest())
+digest = hashlib.sha256(archive.read_bytes()).hexdigest()
+assert digest == 'eea36124087fed26c59996a4761519458e3bd185e8ea9d9865ad8760c4a1d989', 'Model SHA256 mismatch'
+print('Korean model archive SHA256:', digest)
 assets = base / 'app/src/main/assets'
 assets.mkdir(parents=True, exist_ok=True)
 model = assets / 'wake-model'

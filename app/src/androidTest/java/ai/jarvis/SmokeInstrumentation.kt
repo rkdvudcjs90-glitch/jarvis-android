@@ -29,6 +29,10 @@ class SmokeInstrumentation : Instrumentation() {
             check(!raw.contains(sample) && raw.isNotBlank()) { "Plaintext stored" }
             vault.clear()
             val localModel=LocalModel.load(targetContext)
+            val find=com.sun.jna.NativeLibrary.getInstance("vosk").getFunction("vosk_model_find_word")
+            val tokens=listOf("자비스","자비서","자비","비스","자","스")
+            val words=tokens.associateWith { find.invokeInt(arrayOf(localModel.pointer,it)) }
+            android.util.Log.i("JARVIS_TEST","WAKE_VOCAB: $words")
             val localRecognizer=org.vosk.Recognizer(localModel,16000f)
             try {
                 localRecognizer.acceptWaveForm(ByteArray(32000),32000)
@@ -48,7 +52,7 @@ class SmokeInstrumentation : Instrumentation() {
             uiAutomation.takeScreenshot()?.let { bitmap ->
                 File(directory,"settings.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG,100,it) }; bitmap.recycle()
             }
-            result.putString("stream","PASS: Android launch, hologram layout, settings entry, Keystore AES-GCM encrypted round-trip. Korean native offline model load and silence decoding passed. Wake accuracy, screen-off standby, real voice/API/ROOT/device remain unverified.\n")
+            result.putString("stream","PASS: Android launch, hologram layout, settings entry, Keystore AES-GCM encrypted round-trip. Korean native offline model load and silence decoding passed. Wake vocabulary: $words. Wake accuracy, screen-off standby, real voice/API/ROOT/device remain unverified.\n")
             finish(Activity.RESULT_OK,result)
         } catch(t: Throwable) {
             result.putString("stream","FAIL: ${t.javaClass.simpleName}: ${t.message}\n")

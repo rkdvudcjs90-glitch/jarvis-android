@@ -7,3 +7,5 @@ local.properties
 
 app/src/main/assets/wake-model/
 model-download.zip
+
+.ci-signing/

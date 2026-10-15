@@ -26,6 +26,7 @@ class VoiceService : Service(), RecognitionListener {
         const val STOP="ai.jarvis.STOP"
         const val TEXT="ai.jarvis.TEXT"
         const val PING="ai.jarvis.PING"
+        const val STOP_REPLY="ai.jarvis.STOP_REPLY"
     }
     private enum class Phase { LOADING, WAKE, SPEAKING, COMMAND, CONFIRM, BUSY, STOPPED }
     private var phase=Phase.LOADING
@@ -160,23 +161,30 @@ class VoiceService : Service(), RecognitionListener {
     private fun command(text: String) {
         main.removeCallbacks(timeout); speech?.setPause(true)
         val action=VoicePolicy.action(text)
-        if(action==VoicePolicy.Action.LOCK) {
-            pending=action; say("화면을 잠글까요? 실행 또는 취소라고 말씀해 주십시오.") { listen(true) }; return
-        }
-        if(action!=null) { perform(action); return }
+        if(action!=null) { handleAction(action); return }
         if(VoicePolicy.cancelled(text) || VoicePolicy.normalize(text) in setOf("고마워", "대기해", "대기해줘")) { say("호출 대기하겠습니다.") { waitWake() }; return }
         phase=Phase.BUSY; update("생각 중",2)
         val request=JSONArray(history.toString()).put(JSONObject().put("role","user").put("content",text.take(6000)))
         val chosen=prefs.getString("model","gpt-4.1-mini") ?: "gpt-4.1-mini"
         worker.execute {
             try {
-                val response=api.reply(vault.get("api-key"),chosen,request)
+                val decision=api.plan(vault.get("api-key"),chosen,request)
+                if(decision.action!=null) {
+                    main.post { if(!dead) handleAction(decision.action) }
+                    return@execute
+                }
+                val response=decision.text ?: error("빈 응답입니다.")
                 request.put(JSONObject().put("role","assistant").put("content",response))
                 val bounded=JSONArray(); for(i in maxOf(0,request.length()-20) until request.length()) bounded.put(request.getJSONObject(i))
                 vault.put("history",bounded.toString())
                 main.post { if(!dead) { history=bounded; prefs.edit().putLong("voice-history-revision",System.currentTimeMillis()).apply(); say(response) { listen() } } }
             } catch(e: Exception) { main.post { if(!dead) say(e.message ?: "통신 오류입니다. 다시 말씀해 주십시오.") { listen() } } }
         }
+    }
+    private fun handleAction(action: VoicePolicy.Action) {
+        if(action==VoicePolicy.Action.LOCK) {
+            pending=action; say("화면을 잠글까요? 실행 또는 취소라고 말씀해 주십시오.") { listen(true) }
+        } else perform(action)
     }
     private fun perform(action: VoicePolicy.Action) {
         phase=Phase.BUSY; speech?.setPause(true)
@@ -213,6 +221,7 @@ class VoiceService : Service(), RecognitionListener {
     }
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if(intent?.action==STOP) stopSelf()
+        else if(intent?.action==STOP_REPLY && phase==Phase.SPEAKING) { tts?.stop(); afterSpeech() }
         else if(intent?.action==PING && (phase==Phase.WAKE || phase==Phase.COMMAND)) say("상시 대기가 작동 중입니다.") { waitWake() }
         else if(intent?.action==TEXT && (phase==Phase.WAKE || phase==Phase.COMMAND)) intent.getStringExtra("text")?.let { command(it) }
         return START_NOT_STICKY

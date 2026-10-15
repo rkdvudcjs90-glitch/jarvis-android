@@ -86,7 +86,7 @@ class MainActivity : Activity(), RecognitionListener {
         mic = button("음성") { startListening() }
         send = button("전송") { submit(input.text.toString()) }
         actions.addView(mic,LinearLayout.LayoutParams(0,-2,1f)); actions.addView(send,LinearLayout.LayoutParams(0,-2,1f))
-        actions.addView(button("음성 중지") { tts?.stop(); if (!busy) state("대기 중") },LinearLayout.LayoutParams(0,-2,1f))
+        actions.addView(button("음성 중지") { if(VoiceService.running) startService(Intent(this,VoiceService::class.java).setAction(VoiceService.STOP_REPLY)) else { tts?.stop(); if (!busy) state("대기 중") } },LinearLayout.LayoutParams(0,-2,1f))
         layout.addView(actions)
         val standby = LinearLayout(this)
         standby.addView(button("상시 대기 시작") { startStandby() },LinearLayout.LayoutParams(0,-2,1f))
