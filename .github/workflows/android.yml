@@ -17,13 +17,16 @@ jobs:
           distribution: temurin
           java-version: '17'
       - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+          log-accepted-android-sdk-licenses: false
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.13'
       - name: Install SDK 36
         run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
       - name: Build, unit tests and lint
-        run: gradle --no-daemon :app:testDebugUnitTest :app:lintDebug :app:assembleDebug
+        run: gradle --no-daemon :app:testDebugUnitTest :app:lintDebug :app:assembleDebug :app:assembleDebugAndroidTest
       - name: Verify signed APK
         run: |
           "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose app/build/outputs/apk/debug/app-debug.apk
@@ -36,8 +39,89 @@ jobs:
             app/build/outputs/apk/debug/SHA256SUMS.txt
           if-no-files-found: error
       - uses: actions/upload-artifact@v4
+        with:
+          name: instrumented-test-apk
+          path: app/build/outputs/apk/androidTest/debug/*.apk
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: validation-reports
           path: app/build/reports/
           if-no-files-found: ignore
+
+  emulator:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: actions/download-artifact@v4
+        with:
+          name: JARVIS-installable-debug-apk
+          path: apk
+      - uses: actions/download-artifact@v4
+        with:
+          name: instrumented-test-apk
+          path: test-apk
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 36
+          arch: x86_64
+          target: google_apis
+          profile: pixel_5
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none
+          script: |
+            adb install apk/app-debug.apk
+            adb install test-apk/app-debug-androidTest.apk
+            adb shell am instrument -w ai.jarvis.test/ai.jarvis.SmokeInstrumentation | tee instrumentation.txt
+            grep -q 'PASS:' instrumentation.txt
+            adb pull /sdcard/Android/data/ai.jarvis/files/smoke/ screenshots
+            adb logcat -d -b crash > crash-log.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: emulator-smoke-results
+          path: |
+            instrumentation.txt
+            screenshots/
+            crash-log.txt
+          if-no-files-found: ignore
+
+  download:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [build, emulator]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: JARVIS-installable-debug-apk
+          path: apk
+      - name: Publish tested preview APK
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          JARVIS_RUN: ${{ github.run_number }}
+          JARVIS_SHA: ${{ github.sha }}
+        run: |
+          cp apk/app-debug.apk JARVIS-0.1.0.apk
+          sha256sum JARVIS-0.1.0.apk > SHA256SUMS.txt
+          cat > release-notes.txt <<'NOTES'
+          설치 테스트용 Kotlin 네이티브 Android APK (debug 서명).
+          CI: Kotlin 컴파일, ROOT 명령 정책 단위 테스트, Android lint, APK 서명 검사, Android 16 에뮬레이터 시작/설정/Keystore 암호화 검사 통과.
+          Galaxy Z Flip5 실기기, 실제 OpenAI API 대화, 한국어 음성 인식/TTS, 접근성 동작, ROOT 실행은 미검증입니다.
+          API 키는 앱 설정에서 직접 입력하세요. ChatGPT 구독과 API 요금은 별개입니다.
+          NOTES
+          gh release create "preview-$JARVIS_RUN" JARVIS-0.1.0.apk SHA256SUMS.txt --target "$JARVIS_SHA" --prerelease --title 'JARVIS 0.1.0 · Android 설치 테스트' --notes-file release-notes.txt
