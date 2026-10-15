@@ -51,8 +51,8 @@ jobs:
       - uses: actions/upload-artifact@v4
         id: apk
         with:
-          artifact-ids: ${{ needs.build.outputs.apk-artifact }}
-          merge-multiple: true
+          name: JARVIS-installable-debug-apk
+          overwrite: true
           path: |
             app/build/outputs/apk/debug/app-debug.apk
             app/build/outputs/apk/debug/SHA256SUMS.txt
@@ -60,14 +60,15 @@ jobs:
       - uses: actions/upload-artifact@v4
         id: tests
         with:
-          artifact-ids: ${{ needs.build.outputs.test-artifact }}
-          merge-multiple: true
+          name: instrumented-test-apk
+          overwrite: true
           path: app/build/outputs/apk/androidTest/debug/*.apk
           if-no-files-found: error
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: validation-reports
+          overwrite: true
           path: app/build/reports/
           if-no-files-found: ignore
 
@@ -120,8 +121,8 @@ jobs:
         id: smoke
         if: always()
         with:
-          artifact-ids: ${{ needs.emulator.outputs.smoke-artifact }}
-          merge-multiple: true
+          name: emulator-smoke-results
+          overwrite: true
           path: |
             instrumentation.txt
             screenshots/
