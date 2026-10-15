@@ -16,6 +16,9 @@ class SmokeInstrumentation : Instrumentation() {
     override fun onCreate(arguments: Bundle?) { super.onCreate(arguments); start() }
     private fun descendants(view: View): List<View> = listOf(view) +
         if(view is ViewGroup) (0 until view.childCount).flatMap { descendants(view.getChildAt(it)) } else emptyList()
+    // Startup/thinking is amber, speech is green and failures are red; visibility
+    // must use the strongest RGB channel rather than assuming an idle blue tint.
+    private fun brightness(color: Int) = maxOf(android.graphics.Color.red(color),android.graphics.Color.green(color),android.graphics.Color.blue(color))
     override fun onStart() {
         val result=Bundle()
         var activity: Activity?=null
@@ -63,7 +66,7 @@ class SmokeInstrumentation : Instrumentation() {
                     for(y in next.height*3/10 until next.height*7/10 step 4) {
                         for(x in next.width/5 until next.width*4/5 step 4) {
                             val color=next.getPixel(x,y)
-                            if(android.graphics.Color.green(color)>110 && android.graphics.Color.blue(color)>120) luminous++
+                            if(brightness(color)>120) luminous++
                         }
                     }
                     if((core?.renderedFrames ?: 0)>0 && luminous>100) break
@@ -91,7 +94,7 @@ class SmokeInstrumentation : Instrumentation() {
                             for(y in frame.height*3/10 until frame.height*7/10 step 4) {
                                 for(x in frame.width/5 until frame.width*4/5 step 4) {
                                     val a=initial.getPixel(x,y); val b=frame.getPixel(x,y)
-                                    if(kotlin.math.abs(android.graphics.Color.blue(a)-android.graphics.Color.blue(b))>30) changed++
+                                    if(kotlin.math.abs(brightness(a)-brightness(b))>30) changed++
                                 }
                             }
                         }
