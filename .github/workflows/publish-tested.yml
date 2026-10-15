@@ -1,0 +1,39 @@
+name: Publish verified 0.5.2 artifacts
+on:
+  push:
+    branches: [publish-tested-0.5.2]
+permissions:
+  actions: read
+  contents: write
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          artifact-ids: '12014032020'
+          run-id: '38822439544'
+          github-token: ${{ github.token }}
+          path: apk
+      - uses: actions/download-artifact@v4
+        with:
+          artifact-ids: '12013099203'
+          run-id: '38822439544'
+          github-token: ${{ github.token }}
+          path: smoke
+      - name: Verify passed evidence and publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          grep -q 'PASS:' smoke/instrumentation.txt
+          test -s smoke/design-preview.mp4
+          cp apk/app-debug.apk JARVIS-0.5.2.apk
+          sha256sum JARVIS-0.5.2.apk > SHA256SUMS.txt
+          cat > release-notes.txt <<'NOTES'
+          상단 이름 및 상태 안내 글씨를 숨긴 0.5.2 업데이트입니다. 구체를 길게 누르면 상태와 설정 패널을 엽니다. 자동 음성 대기는 유지합니다. 기존 앱을 삭제하지 말고 업데이트하세요.
+          Actions 38822439544: 빌드·단위 검사·lint·서명 검증 통과. 최초 종료/재실행 에뮬레이터 검사에서 ANR이 발생했고, 동일 APK 재검사에서는 통과했습니다. 원인은 확정하지 않았습니다. 실기기 장시간 음성 대기는 별도 확인이 필요합니다.
+          재검사에서 통과한 정확한 아티팩트 ID를 지정해 배포했습니다. 모든 앱의 완전 자동화를 의미하지 않습니다.
+          NOTES
+          gh release create preview-12 JARVIS-0.5.2.apk SHA256SUMS.txt smoke/screenshots/hologram.png smoke/design-preview.mp4 --target 'ef91c5f3d9372fc322f19b5dae505659bafb87f2' --prerelease --title 'JARVIS 0.5.2 · 상단 글씨 없는 구체 화면' --notes-file release-notes.txt
