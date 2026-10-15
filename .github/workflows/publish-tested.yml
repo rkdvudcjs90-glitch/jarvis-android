@@ -16,6 +16,7 @@ jobs:
           run-id: '38822439544'
           github-token: ${{ github.token }}
           path: apk
+          merge-multiple: true
       - name: Download exact passed retry archive
         env:
           GH_TOKEN: ${{ github.token }}
