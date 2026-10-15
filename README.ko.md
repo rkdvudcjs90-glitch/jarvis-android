@@ -1,6 +1,8 @@
 # J.A.R.V.I.S. ROOT ADVANCED
 
-현재 상태: 구현 소스와 CI 구성 작성. 컴파일·APK 생성·실기기 테스트 미완료. 완성품으로 표시하지 않습니다.
+현재 상태: 설치 테스트용 APK 생성 완료. Kotlin 컴파일·단위 테스트·lint·서명 검사 및 Android 16 에뮬레이터 기본 검사 통과. Galaxy Z Flip5 실기기와 실제 API·음성·접근성·ROOT 기능은 미검증.
+
+[APK 바로 다운로드](https://github.com/rkdvudcjs90-glitch/jarvis-android/releases/download/preview-2/JARVIS-0.1.0.apk) · [검사 실행 결과](https://github.com/rkdvudcjs90-glitch/jarvis-android/actions/runs/38690971006)
 
 ## 설계 및 기능
 
