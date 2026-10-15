@@ -41,10 +41,25 @@ class SmokeInstrumentation : Instrumentation() {
             activity=startActivitySync(Intent(targetContext,MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
             waitForIdleSync()
             Thread.sleep(2000) // Permit EGL surface creation; this is an emulator test, not a production delay.
+            val preview=uiAutomation.takeScreenshot() ?: error("Screenshot unavailable")
+            try {
+                var luminous=0
+                for(y in preview.height*3/10 until preview.height*7/10 step 4) {
+                    for(x in preview.width/5 until preview.width*4/5 step 4) {
+                        val color=preview.getPixel(x,y)
+                        if(android.graphics.Color.green(color)>110 && android.graphics.Color.blue(color)>120) luminous++
+                    }
+                }
+                check(luminous>100) { "Neon core did not render visibly: $luminous samples" }
+                val folder=File(targetContext.getExternalFilesDir(null),"smoke").apply { mkdirs() }
+                File(folder,"hologram.png").outputStream().use { preview.compress(Bitmap.CompressFormat.PNG,100,it) }
+            } finally { preview.recycle() }
             runOnMainSync {
                 val views=descendants(activity!!.window.decorView)
                 check(views.filterIsInstance<Hologram>().any { it.width>0 && it.height>0 }) { "Hologram has no layout" }
                 check(views.filterIsInstance<TextView>().any { it.text.contains("J.A.R.V.I.S.") }) { "Main UI missing" }
+                views.filterIsInstance<Button>().first { it.text=="설정·조작" }.performClick()
+                check(views.filterIsInstance<Button>().first { it.text=="설정·권한" }.isShown) { "Settings panel did not expand" }
                 views.filterIsInstance<Button>().first { it.text=="설정·권한" }.performClick()
             }
             waitForIdleSync()
@@ -52,7 +67,7 @@ class SmokeInstrumentation : Instrumentation() {
             uiAutomation.takeScreenshot()?.let { bitmap ->
                 File(directory,"settings.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG,100,it) }; bitmap.recycle()
             }
-            result.putString("stream","PASS: Android launch, hologram layout, settings entry, Keystore AES-GCM encrypted round-trip. Korean native offline model load and silence decoding passed. Wake vocabulary: $words. Wake accuracy, screen-off standby, real voice/API/ROOT/device remain unverified.\n")
+            result.putString("stream","PASS: Android launch, visible neon core rendering, hologram layout, expandable settings entry, Keystore AES-GCM encrypted round-trip. Korean native offline model load and silence decoding passed. Wake vocabulary: $words. Wake accuracy, screen-off standby, real voice/API/ROOT/device remain unverified.\n")
             finish(Activity.RESULT_OK,result)
         } catch(t: Throwable) {
             result.putString("stream","FAIL: ${t.javaClass.simpleName}: ${t.message}\n")

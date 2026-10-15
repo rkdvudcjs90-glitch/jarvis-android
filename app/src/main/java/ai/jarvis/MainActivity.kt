@@ -22,6 +22,9 @@ class MainActivity : Activity(), RecognitionListener {
     private lateinit var vault: Vault
     private lateinit var orb: Hologram
     private lateinit var status: TextView
+    private lateinit var title: TextView
+    private lateinit var lastMessage: TextView
+    private lateinit var quickStandby: Button
     private lateinit var transcript: TextView
     private lateinit var input: EditText
     private lateinit var mic: Button
@@ -41,6 +44,8 @@ class MainActivity : Activity(), RecognitionListener {
     private val voicePoll = object : Runnable {
         override fun run() {
             if (!visible || isDestroyed) return
+            title.text=if(VoiceService.running) "J.A.R.V.I.S. ACTIVE" else "J.A.R.V.I.S. STANDBY"
+            quickStandby.text=if(VoiceService.running) "대기 종료" else "상시 대기 시작"
             if (VoiceService.running) {
                 state(prefs.getString("voice-status", "상시 대기 준비 중") ?: "상시 대기", prefs.getInt("voice-mode", 0))
                 val revision=prefs.getLong("voice-history-revision", 0)
@@ -54,7 +59,15 @@ class MainActivity : Activity(), RecognitionListener {
     }
     private val prefs by lazy { getSharedPreferences("settings", MODE_PRIVATE) }
     private fun text(value: String, size: Float = 15f) = TextView(this).apply { text = value; textSize = size; setTextColor(Color.rgb(195,227,240)); setPadding(12,8,12,8) }
-    private fun button(label: String, action: () -> Unit) = Button(this).apply { text = label; setOnClickListener { action() } }
+    private fun button(label: String, action: () -> Unit) = Button(this).apply {
+        text=label; textSize=12f; isAllCaps=false; setTextColor(Color.rgb(130,235,246))
+        background=android.graphics.drawable.GradientDrawable().apply {
+            setColor(Color.rgb(5,20,29)); cornerRadius=12f
+            setStroke(1,Color.rgb(27,87,101))
+        }
+        minHeight=(48*resources.displayMetrics.density).toInt(); setPadding(8,8,8,8)
+        setOnClickListener { action() }
+    }
     private fun state(message: String, mode: Int = 0) { status.text = message; orb.mode = mode }
     private fun problem(message: String) { state(message, 4) }
     private fun guarded(action: () -> Unit) { try { action() } catch (e: Exception) { problem(e.message ?: "동작 실패") } }
@@ -71,32 +84,58 @@ class MainActivity : Activity(), RecognitionListener {
                 v.setPadding(16,insets.systemWindowInsetTop,16,insets.systemWindowInsetBottom)
             }; insets
         }
-        layout.addView(text("J.A.R.V.I.S.  /  ROOT ADVANCED",20f))
-        status = text("대기 중 · 마이크를 눌러 대화하세요")
+        title=text("J.A.R.V.I.S. STANDBY",22f).apply {
+            gravity=Gravity.CENTER; letterSpacing=0.09f; setTextColor(Color.rgb(100,244,255))
+            setShadowLayer(16f,0f,0f,Color.rgb(0,180,210)); setPadding(12,28,12,4)
+        }
+        layout.addView(title)
+        status=text("상시 대기를 시작하면 ‘자비스’라고 부르세요",13f).apply {
+            gravity=Gravity.CENTER; maxLines=3; ellipsize=android.text.TextUtils.TruncateAt.END
+        }
         layout.addView(status)
-        orb = Hologram(this)
-        layout.addView(orb,LinearLayout.LayoutParams(-1,0,1.1f))
-        val scroll = ScrollView(this)
-        transcript = text("")
+        orb=Hologram(this)
+        layout.addView(orb,LinearLayout.LayoutParams(-1,0,1f))
+        lastMessage=text("말씀을 기다리고 있습니다",14f).apply {
+            gravity=Gravity.CENTER; maxLines=3; ellipsize=android.text.TextUtils.TruncateAt.END
+            setTextColor(Color.rgb(155,205,218)); setPadding(16,4,16,18)
+        }
+        layout.addView(lastMessage)
+        val panel=LinearLayout(this).apply { orientation=LinearLayout.VERTICAL; visibility=View.GONE }
+        val toolbar=LinearLayout(this)
+        quickStandby=button("상시 대기 시작") {
+            if(VoiceService.running) { stopService(Intent(this,VoiceService::class.java)); state("상시 대기 종료") }
+            else startStandby()
+        }
+        toolbar.addView(quickStandby,LinearLayout.LayoutParams(0,-2,1f).apply { setMargins(4,4,4,4) })
+        val expand=button("설정·조작") {}
+        expand.setOnClickListener {
+            panel.visibility=if(panel.visibility==View.VISIBLE) View.GONE else View.VISIBLE
+            expand.text=if(panel.visibility==View.VISIBLE) "조작 패널 닫기" else "설정·조작"
+        }
+        toolbar.addView(expand,LinearLayout.LayoutParams(0,-2,1f).apply { setMargins(4,4,4,4) })
+        layout.addView(toolbar)
+        val scroll=ScrollView(this)
+        transcript=text("")
         scroll.addView(transcript)
-        layout.addView(scroll,LinearLayout.LayoutParams(-1,0,1f))
-        input = EditText(this).apply { hint="한국어로 입력하세요"; setTextColor(Color.WHITE); setHintTextColor(Color.GRAY); maxLines=3; inputType=InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE }
-        layout.addView(input)
-        val actions = LinearLayout(this)
-        mic = button("음성") { startListening() }
-        send = button("전송") { submit(input.text.toString()) }
+        panel.addView(scroll,LinearLayout.LayoutParams(-1,(120*resources.displayMetrics.density).toInt()))
+        input=EditText(this).apply { hint="한국어로 입력하세요"; setTextColor(Color.WHITE); setHintTextColor(Color.GRAY); maxLines=2; inputType=InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE }
+        panel.addView(input)
+        val actions=LinearLayout(this)
+        mic=button("음성") { startListening() }
+        send=button("전송") { submit(input.text.toString()) }
         actions.addView(mic,LinearLayout.LayoutParams(0,-2,1f)); actions.addView(send,LinearLayout.LayoutParams(0,-2,1f))
-        actions.addView(button("음성 중지") { if(VoiceService.running) startService(Intent(this,VoiceService::class.java).setAction(VoiceService.STOP_REPLY)) else { tts?.stop(); if (!busy) state("대기 중") } },LinearLayout.LayoutParams(0,-2,1f))
-        layout.addView(actions)
-        val standby = LinearLayout(this)
-        standby.addView(button("상시 대기 시작") { startStandby() },LinearLayout.LayoutParams(0,-2,1f))
-        standby.addView(button("상시 대기 종료") { stopService(Intent(this,VoiceService::class.java)); state("상시 대기 종료") },LinearLayout.LayoutParams(0,-2,1f))
-        layout.addView(standby)
-        val tools = LinearLayout(this)
+        actions.addView(button("음성 중지") { if(VoiceService.running) startService(Intent(this,VoiceService::class.java).setAction(VoiceService.STOP_REPLY)) else { tts?.stop(); if(!busy) state("대기 중") } },LinearLayout.LayoutParams(0,-2,1f))
+        panel.addView(actions)
+        val tools=LinearLayout(this)
         tools.addView(button("설정·권한") { settings() },LinearLayout.LayoutParams(0,-2,1f))
         tools.addView(button("휴대폰 제어") { controls() },LinearLayout.LayoutParams(0,-2,1f))
-        tools.addView(button("대화 삭제") { confirm("저장된 대화를 삭제할까요?") { if (!busy && !VoiceService.running) { history=JSONArray(); guarded { vault.put("history", "[]") }; renderHistory() } } },LinearLayout.LayoutParams(0,-2,1f))
-        layout.addView(tools); setContentView(layout)
+        tools.addView(button("대화 삭제") { confirm("저장된 대화를 삭제할까요?") {
+            if(busy || VoiceService.running) problem("대화와 상시 대기를 종료한 뒤 삭제하세요.")
+            else { history=JSONArray(); guarded { vault.put("history","[]") }; renderHistory() }
+        } },LinearLayout.LayoutParams(0,-2,1f))
+        panel.addView(tools)
+        layout.addView(panel)
+        setContentView(layout)
         guarded { val saved=vault.get("history"); if(saved.isNotEmpty()) history=JSONArray(saved) }
         renderHistory()
         tts = TextToSpeech(this) { result -> main.post {
@@ -111,11 +150,12 @@ class MainActivity : Activity(), RecognitionListener {
         })
         if(!prefs.getBoolean("onboarded",false)) {
             AlertDialog.Builder(this).setTitle("자비스 시작 안내")
-                .setMessage("설정에서 OpenAI API 키를 입력하세요. 메시지와 최근 대화가 OpenAI로 전송되며 API 요금이 발생합니다. 음성 인식은 설치된 Android 음성 서비스가 처리하며 네트워크로 전송될 수 있습니다.\n\n마이크는 음성 버튼을 누를 때만 사용합니다. 접근성은 선택 사항이며 화면 내용을 수집하지 않습니다. 제어 버튼을 누를 때만 홈·뒤로·화면 잠금을 수행합니다. ROOT는 별도 선택 기능입니다.")
+                .setMessage("설정에서 OpenAI API 키를 입력하세요. 메시지와 최근 대화가 OpenAI로 전송되며 API 요금이 발생합니다. 음성 인식은 설치된 Android 음성 서비스가 처리하며 네트워크로 전송될 수 있습니다.\n\n음성 버튼은 누를 때 녹음하며, 상시 대기를 시작하면 호출어 감지를 위해 마이크를 계속 사용합니다. 알림과 대기 종료로 중단할 수 있습니다. 접근성은 선택 사항이며 화면 내용을 수집하지 않습니다. 승인 후 지원되는 음성 지시 또는 제어 버튼으로 동작합니다. ROOT는 별도 선택 기능입니다.")
                 .setPositiveButton("설정 열기") { _,_ -> prefs.edit().putBoolean("onboarded",true).apply(); settings() }.show()
         }
     }
     private fun renderHistory() {
+        lastMessage.text=if(history.length()>0) history.getJSONObject(history.length()-1).optString("content").take(350) else "말씀을 기다리고 있습니다"
         transcript.text = (0 until history.length()).joinToString("\n\n") { val item=history.getJSONObject(it); (if(item.getString("role")=="user") "나: " else "자비스: ")+item.getString("content") }
     }
     private fun startStandby() {
