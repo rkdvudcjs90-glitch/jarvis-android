@@ -1,7 +1,7 @@
 # J.A.R.V.I.S. Android
 
-Kotlin 네이티브 Android AI 비서 · 설치 테스트 버전.
+상시 음성 비서 0.2 개발 중. ‘자비스’ 호출 대기와 음성 명령 실행을 추가합니다. 아직 새 빌드·실기기 검증 전입니다.
 
-[APK 다운로드](https://github.com/rkdvudcjs90-glitch/jarvis-android/releases/download/preview-2/JARVIS-0.1.0.apk) · [한국어 설치 안내](README.ko.md) · [검증 결과와 제한](STATUS.md)
+[0.2 사용 범위와 제한](VOICE-0.2.ko.md) · [0.1 검증 결과](STATUS.md)
 
-컴파일·단위 테스트·lint·서명 검사·Android 16 에뮬레이터 기본 검사 통과. Galaxy Z Flip5 실기기, 실제 OpenAI API·한국어 음성·접근성·ROOT는 미검증.
+‘모든 작업 완전 자동화’는 구현하지 않았습니다. 최초 권한·서비스 시작·재부팅 후 재시작 및 보안 잠금 해제에는 직접 조작이 필요합니다.

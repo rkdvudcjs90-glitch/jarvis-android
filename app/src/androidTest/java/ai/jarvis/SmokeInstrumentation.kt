@@ -28,6 +28,12 @@ class SmokeInstrumentation : Instrumentation() {
             val raw=targetContext.getSharedPreferences("vault",0).getString("smoke","") ?: ""
             check(!raw.contains(sample) && raw.isNotBlank()) { "Plaintext stored" }
             vault.clear()
+            val localModel=LocalModel.load(targetContext)
+            val localRecognizer=org.vosk.Recognizer(localModel,16000f)
+            try {
+                localRecognizer.acceptWaveForm(ByteArray(32000),32000)
+                org.json.JSONObject(localRecognizer.partialResult)
+            } finally { localRecognizer.close(); localModel.close() }
             activity=startActivitySync(Intent(targetContext,MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
             waitForIdleSync()
             Thread.sleep(2000) // Permit EGL surface creation; this is an emulator test, not a production delay.
@@ -42,7 +48,7 @@ class SmokeInstrumentation : Instrumentation() {
             uiAutomation.takeScreenshot()?.let { bitmap ->
                 File(directory,"settings.png").outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG,100,it) }; bitmap.recycle()
             }
-            result.putString("stream","PASS: Android launch, hologram layout, settings entry, Keystore AES-GCM encrypted round-trip. No API/voice/ROOT/device verification.\n")
+            result.putString("stream","PASS: Android launch, hologram layout, settings entry, Keystore AES-GCM encrypted round-trip. Korean native offline model load and silence decoding passed. Wake accuracy, screen-off standby, real voice/API/ROOT/device remain unverified.\n")
             finish(Activity.RESULT_OK,result)
         } catch(t: Throwable) {
             result.putString("stream","FAIL: ${t.javaClass.simpleName}: ${t.message}\n")

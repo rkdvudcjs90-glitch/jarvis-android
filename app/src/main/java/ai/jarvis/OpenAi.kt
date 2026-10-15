@@ -11,7 +11,7 @@ class OpenAi {
     fun reply(key: String, model: String, history: JSONArray): String {
         require(key.isNotBlank()) { "설정에서 OpenAI API 키를 입력하세요." }
         val messages = JSONArray().put(JSONObject().put("role", "system").put("content",
-            "당신은 한국어 비서 자비스입니다. 간결하고 자연스러운 한국어로 답하세요. 휴대폰 상태를 볼 수 없고 기기를 직접 제어하지 못합니다. 제어 요청에는 앱의 제어 버튼을 안내하세요. 실행하지 않은 동작을 실행했다고 말하지 마세요."))
+            "당신은 한국어 비서 자비스입니다. 간결하고 자연스러운 한국어로 답하세요. 앱은 별도 로컬 음성 명령으로 홈, 뒤로, 최근 앱, 화면 잠금, 미디어 볼륨, 유튜브·카메라·캘린더·와이파이 설정 열기만 지원합니다. 당신에게 전달된 요청에는 실행 도구가 없으므로 실제로 실행했다고 말하지 마세요. 지원하는 명령 문구를 짧게 안내하세요. 캘린더 내용 조회·등록, 메시지 전송, 결제, 임의 앱 자동 조작은 지원하지 않습니다. 실행하지 않은 동작을 실행했다고 말하지 마세요."))
         for (i in maxOf(0, history.length() - 20) until history.length()) messages.put(history.getJSONObject(i))
         val body = JSONObject().put("model", model).put("messages", messages).put("max_completion_tokens", 1200)
         val conn = URL("https://api.openai.com/v1/chat/completions").openConnection() as HttpURLConnection

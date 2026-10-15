@@ -25,6 +25,12 @@ jobs:
           gradle-version: '8.13'
       - name: Install SDK 36
         run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Bundle official Korean offline speech model
+        run: python3 scripts/prepare_model.py
+      - uses: actions/cache@v4
+        with:
+          path: ~/.android/debug.keystore
+          key: jarvis-debug-signing-v1
       - name: Build, unit tests and lint
         run: gradle --no-daemon :app:testDebugUnitTest :app:lintDebug :app:assembleDebug :app:assembleDebugAndroidTest
       - name: Verify signed APK
@@ -116,12 +122,12 @@ jobs:
           JARVIS_RUN: ${{ github.run_number }}
           JARVIS_SHA: ${{ github.sha }}
         run: |
-          cp apk/app-debug.apk JARVIS-0.1.0.apk
-          sha256sum JARVIS-0.1.0.apk > SHA256SUMS.txt
+          cp apk/app-debug.apk JARVIS-0.2.0.apk
+          sha256sum JARVIS-0.2.0.apk > SHA256SUMS.txt
           cat > release-notes.txt <<'NOTES'
-          설치 테스트용 Kotlin 네이티브 Android APK (debug 서명).
-          CI: Kotlin 컴파일, ROOT 명령 정책 단위 테스트, Android lint, APK 서명 검사, Android 16 에뮬레이터 시작/설정/Keystore 암호화 검사 통과.
-          Galaxy Z Flip5 실기기, 실제 OpenAI API 대화, 한국어 음성 인식/TTS, 접근성 동작, ROOT 실행은 미검증입니다.
-          API 키는 앱 설정에서 직접 입력하세요. ChatGPT 구독과 API 요금은 별개입니다.
+          상시 음성 비서 0.2 설치 테스트용 APK (debug 서명). 최초 앱에서 상시 대기를 시작하고 자비스라고 부르는 구조입니다.
+          CI: Kotlin 컴파일, ROOT 명령 정책 단위 테스트, Android lint, APK 서명 검사, Android 16 에뮬레이터 시작/설정/Keystore 암호화 및 한국어 오프라인 모델 로딩·무음 디코딩 검사 통과.
+          0.2의 실제 호출어 인식률·화면 꺼짐 상시 대기·음성 명령 실행·조정된 TTS는 Galaxy Z Flip5에서 미검증입니다. 모든 앱의 완전 자동화는 구현하지 않았습니다. 재부팅/강제 종료 후 수동 재시작이 필요합니다.
+          이전 0.1과 서명이 달라 기존 앱 삭제 후 설치가 필요할 수 있으며 키와 이력이 삭제될 수 있습니다. API 키는 앱 설정에서 직접 입력하세요. ChatGPT 구독과 API 요금은 별개입니다.
           NOTES
-          gh release create "preview-$JARVIS_RUN" JARVIS-0.1.0.apk SHA256SUMS.txt --target "$JARVIS_SHA" --prerelease --title 'JARVIS 0.1.0 · Android 설치 테스트' --notes-file release-notes.txt
+          gh release create "preview-$JARVIS_RUN" JARVIS-0.2.0.apk SHA256SUMS.txt --target "$JARVIS_SHA" --prerelease --title 'JARVIS 0.2.0 · Android 설치 테스트' --notes-file release-notes.txt

@@ -4,3 +4,6 @@ local.properties
 *.jks
 *.keystore
 .env
+
+app/src/main/assets/wake-model/
+model-download.zip
